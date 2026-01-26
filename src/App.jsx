@@ -1,5 +1,3 @@
-
-나의 말:
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -40,7 +38,7 @@ function formatTime(sec) {
   const hh = String(Math.floor(s / 3600)).padStart(2, "0");
   const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
-  return ${hh}:${mm}:${ss};
+  return `${hh}:${mm}:${ss}`;
 }
 
 function normalizeCode(code) {
@@ -61,7 +59,7 @@ function openHintWindow({ title, body }) {
     .replaceAll(">", "&gt;")
     .replaceAll("\n", "<br/>");
 
-  w.document.write(
+  w.document.write(`
     <!doctype html>
     <html>
       <head>
@@ -87,7 +85,7 @@ function openHintWindow({ title, body }) {
         </div>
       </body>
     </html>
-  );
+  `);
   w.document.close();
 }
 
@@ -202,7 +200,7 @@ export default function App() {
 
   function handleUseHint() {
     if (hintUses >= MAX_HINT_USES) {
-      alert(힌트는 최대 ${MAX_HINT_USES}번까지 사용할 수 있습니다.);
+      alert(`힌트는 최대 ${MAX_HINT_USES}번까지 사용할 수 있습니다.`);
       return;
     }
 
@@ -266,7 +264,7 @@ export default function App() {
 
   function handleDeleteHint(code) {
     if (!adminMode) return;
-    if (!confirm(힌트 코드 ${code}를 삭제할까요?)) return;
+    if (!confirm(`힌트 코드 ${code}를 삭제할까요?`)) return;
     setHints((prev) => {
       const next = { ...prev };
       delete next[code];
@@ -294,7 +292,7 @@ export default function App() {
 
           <button
             style={btnStyleNeutral()}
-            onClick={() => alert(남은 시간: ${formatTime(remainingSec)})}
+            onClick={() => alert(`남은 시간: ${formatTime(remainingSec)}`)}
             title="남은 시간을 확인합니다."
           >
             남은 시간: <b>{formatTime(remainingSec)}</b>
