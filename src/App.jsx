@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  * - Remaining time button
  * - Hint button: enter hint code -> open hint in a new window
  * - Hint usage limit: 3
- * - Admin code: enable adding hint codes
+ * - Admin code: enable adding hint codes (limit: 1 add per admin session)
  *
  * Note: This is NOT secure if deployed publicly with source exposed.
  */
@@ -59,6 +59,7 @@ function openHintWindow({ title, body }) {
     .replaceAll(">", "&gt;")
     .replaceAll("\n", "<br/>");
 
+  // 어두운 미니멀 힌트 창 스타일
   w.document.write(`
     <!doctype html>
     <html>
@@ -67,13 +68,40 @@ function openHintWindow({ title, body }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${escapedTitle}</title>
         <style>
-          body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 20px; background: #0b0f19; color: #e6e8ee; }
-          .card { background: #121a2a; border: 1px solid #24314d; border-radius: 14px; padding: 16px; }
-          h1 { font-size: 18px; margin: 0 0 10px; }
-          .body { font-size: 14px; line-height: 1.6; }
-          .meta { margin-top: 14px; font-size: 12px; color: #aab2c5; }
-          button { margin-top: 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid #2d3c5d; background: #17233a; color: #e6e8ee; cursor: pointer; }
-          button:hover { filter: brightness(1.08); }
+          :root {
+            --bg: #0a0d14;
+            --card: #101625;
+            --border: #1f2a40;
+            --text: #e7e9ee;
+            --muted: #98a2b3;
+            --btn: #141d2f;
+            --btnb: #23304a;
+          }
+          body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            margin: 0; padding: 18px;
+            background: var(--bg);
+            color: var(--text);
+          }
+          .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+          }
+          h1 { font-size: 16px; margin: 0 0 10px; letter-spacing: 0.2px; }
+          .body { font-size: 14px; line-height: 1.65; color: var(--text); }
+          .meta { margin-top: 12px; font-size: 12px; color: var(--muted); }
+          button {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--btnb);
+            background: var(--btn);
+            color: var(--text);
+            cursor: pointer;
+          }
+          button:hover { filter: brightness(1.06); }
         </style>
       </head>
       <body>
@@ -118,6 +146,7 @@ export default function App() {
   // Admin state
   const [adminMode, setAdminMode] = useState(false);
   const [adminInput, setAdminInput] = useState("");
+  const [adminAddRemaining, setAdminAddRemaining] = useState(0); // ✅ 관리자 모드 진입 시 1로 리셋
 
   // Hint input state
   const [hintCodeInput, setHintCodeInput] = useState("");
@@ -150,10 +179,7 @@ export default function App() {
 
   // Persist timer
   useEffect(() => {
-    localStorage.setItem(
-      LS_TIMER,
-      JSON.stringify({ durationSec, running, startAtMs })
-    );
+    localStorage.setItem(LS_TIMER, JSON.stringify({ durationSec, running, startAtMs }));
   }, [durationSec, running, startAtMs]);
 
   // Tick
@@ -185,17 +211,10 @@ export default function App() {
   }, [running, remainingSec]);
 
   function handleStart() {
-    // 이미 진행 중이면 무시
     if (running) return;
     setStartAtMs(Date.now());
     setNowMs(Date.now());
     setRunning(true);
-  }
-
-  function handleResetTimer() {
-    setRunning(false);
-    setStartAtMs(null);
-    setNowMs(Date.now());
   }
 
   function handleUseHint() {
@@ -216,17 +235,15 @@ export default function App() {
       return;
     }
 
-    // 사용 처리 후 새 창
     setHintUses((x) => x + 1);
     openHintWindow({ title: hint.title || code, body: hint.body || "" });
-
-    // 입력 초기화
     setHintCodeInput("");
   }
 
   function handleAdminLogin() {
     if (adminInput.trim() === ADMIN_CODE) {
       setAdminMode(true);
+      setAdminAddRemaining(1); // ✅ 관리자 모드 진입 시 힌트 추가 1회 허용
       setAdminInput("");
     } else {
       alert("관리자 코드가 올바르지 않습니다.");
@@ -234,6 +251,13 @@ export default function App() {
   }
 
   function handleAddHint() {
+    if (!adminMode) return;
+
+    if (adminAddRemaining <= 0) {
+      alert("관리자 모드에서 힌트 추가는 1회만 가능합니다.");
+      return;
+    }
+
     const code = normalizeCode(newCode);
     if (!code) {
       alert("추가할 힌트 코드를 입력해 주세요.");
@@ -257,6 +281,8 @@ export default function App() {
       [code]: { title: newTitle.trim(), body: newBody.trim() },
     }));
 
+    setAdminAddRemaining((n) => n - 1); // ✅ 1회 차감
+
     setNewCode("");
     setNewTitle("");
     setNewBody("");
@@ -275,9 +301,20 @@ export default function App() {
   const hintRemaining = MAX_HINT_USES - hintUses;
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", background: "#0b0f19", minHeight: "100vh", color: "#e6e8ee" }}>
+    <div
+      style={{
+        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        minHeight: "100vh",
+        color: "#e6e8ee",
+        // ✅ 어두운 미니멀 배경
+        background:
+          "radial-gradient(900px 540px at 18% 12%, rgba(52, 74, 120, 0.16), transparent 60%)," +
+          "radial-gradient(800px 520px at 82% 20%, rgba(110, 110, 110, 0.10), transparent 58%)," +
+          "linear-gradient(180deg, #070a10 0%, #0b0f19 55%, #070a10 100%)",
+      }}
+    >
       <div style={{ maxWidth: 920, margin: "0 auto", padding: 20 }}>
-        <h1 style={{ margin: "8px 0 16px" }}>방탈출 운영 앱</h1>
+        <h1 style={{ margin: "8px 0 16px", letterSpacing: 0.2 }}>방탈출 운영 앱</h1>
 
         {/* Top controls */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 18 }}>
@@ -302,19 +339,12 @@ export default function App() {
             <span style={{ fontSize: 14, color: "#aab2c5" }}>
               힌트 사용 가능: <b>{hintRemaining}</b> / {MAX_HINT_USES}
             </span>
-            <button
-              onClick={handleResetTimer}
-              style={btnStyleDanger()}
-              title="타이머를 초기화합니다(운영용)."
-            >
-              타이머 초기화
-            </button>
           </div>
         </div>
 
         {/* Hint section */}
         <div style={cardStyle()}>
-          <h2 style={{ marginTop: 0, fontSize: 18 }}>힌트</h2>
+          <h2 style={{ marginTop: 0, fontSize: 18, letterSpacing: 0.2 }}>힌트</h2>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
               value={hintCodeInput}
@@ -334,7 +364,7 @@ export default function App() {
 
         {/* Admin section */}
         <div style={{ ...cardStyle(), marginTop: 14 }}>
-          <h2 style={{ marginTop: 0, fontSize: 18 }}>관리자</h2>
+          <h2 style={{ marginTop: 0, fontSize: 18, letterSpacing: 0.2 }}>관리자</h2>
 
           {!adminMode ? (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -349,7 +379,7 @@ export default function App() {
                 관리자 모드 켜기
               </button>
               <div style={{ fontSize: 13, color: "#aab2c5" }}>
-                관리자 모드에서 힌트 코드를 추가할 수 있습니다.
+                관리자 모드에서 힌트 코드를 1개만 추가할 수 있습니다.
               </div>
             </div>
           ) : (
@@ -375,18 +405,20 @@ export default function App() {
                 style={textareaStyle()}
               />
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <button onClick={handleAddHint} style={btnStylePrimary(false)}>
-                  힌트 코드 추가
-                </button>
-                <button onClick={() => setAdminMode(false)} style={btnStyleNeutral()}>
-                  관리자 모드 끄기
+                <button
+                  onClick={handleAddHint}
+                  style={btnStylePrimary(adminAddRemaining <= 0)}
+                  disabled={adminAddRemaining <= 0}
+                  title={adminAddRemaining <= 0 ? "관리자 모드에서 힌트 추가는 1회만 가능합니다." : "힌트를 추가합니다."}
+                >
+                  힌트 코드 추가 ({adminAddRemaining}/1)
                 </button>
                 <button
-                  onClick={() => setHintUses(0)}
+                  onClick={() => setAdminMode(false)}
                   style={btnStyleNeutral()}
-                  title="힌트 사용 횟수를 0으로 리셋합니다(운영용)."
+                  title="관리자 모드를 종료합니다."
                 >
-                  힌트 사용 리셋
+                  관리자 모드 끄기
                 </button>
               </div>
 
@@ -401,9 +433,7 @@ export default function App() {
                       <div key={code} style={hintRowStyle()}>
                         <div>
                           <div style={{ fontWeight: 700 }}>{code}</div>
-                          <div style={{ fontSize: 13, color: "#aab2c5" }}>
-                            {h.title}
-                          </div>
+                          <div style={{ fontSize: 13, color: "#aab2c5" }}>{h.title}</div>
                         </div>
                         <button
                           onClick={() => handleDeleteHint(code)}
@@ -431,10 +461,12 @@ export default function App() {
 // ======= Styles =======
 function cardStyle() {
   return {
-    background: "#121a2a",
-    border: "1px solid #24314d",
+    background: "rgba(16, 22, 37, 0.92)",
+    border: "1px solid rgba(31, 42, 64, 0.9)",
     borderRadius: 16,
     padding: 16,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.28)",
+    backdropFilter: "blur(6px)",
   };
 }
 
@@ -444,8 +476,8 @@ function inputStyle() {
     maxWidth: "100%",
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid #2d3c5d",
-    background: "#0f1626",
+    border: "1px solid #25314b",
+    background: "rgba(12, 18, 32, 0.9)",
     color: "#e6e8ee",
     outline: "none",
   };
@@ -458,8 +490,8 @@ function textareaStyle() {
     marginTop: 10,
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid #2d3c5d",
-    background: "#0f1626",
+    border: "1px solid #25314b",
+    background: "rgba(12, 18, 32, 0.9)",
     color: "#e6e8ee",
     outline: "none",
     resize: "vertical",
@@ -471,8 +503,8 @@ function btnStylePrimary(disabled) {
   return {
     padding: "10px 14px",
     borderRadius: 12,
-    border: "1px solid #2d3c5d",
-    background: disabled ? "#1a2740" : "#1d3b73",
+    border: "1px solid #25314b",
+    background: disabled ? "rgba(20, 29, 47, 0.55)" : "rgba(25, 45, 84, 0.9)",
     color: "#e6e8ee",
     cursor: disabled ? "not-allowed" : "pointer",
     fontWeight: 700,
@@ -483,21 +515,9 @@ function btnStyleNeutral() {
   return {
     padding: "10px 14px",
     borderRadius: 12,
-    border: "1px solid #2d3c5d",
-    background: "#17233a",
+    border: "1px solid #25314b",
+    background: "rgba(20, 29, 47, 0.88)",
     color: "#e6e8ee",
-    cursor: "pointer",
-    fontWeight: 600,
-  };
-}
-
-function btnStyleDanger() {
-  return {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid #5d2d2d",
-    background: "#3a1717",
-    color: "#ffd7d7",
     cursor: "pointer",
     fontWeight: 600,
   };
@@ -507,8 +527,8 @@ function btnStyleDangerSmall() {
   return {
     padding: "8px 10px",
     borderRadius: 12,
-    border: "1px solid #5d2d2d",
-    background: "#3a1717",
+    border: "1px solid rgba(93, 45, 45, 0.95)",
+    background: "rgba(58, 23, 23, 0.95)",
     color: "#ffd7d7",
     cursor: "pointer",
     fontWeight: 600,
@@ -524,7 +544,7 @@ function hintRowStyle() {
     gap: 12,
     padding: "10px 12px",
     borderRadius: 14,
-    border: "1px solid #24314d",
-    background: "#0f1626",
+    border: "1px solid rgba(31, 42, 64, 0.95)",
+    background: "rgba(12, 18, 32, 0.85)",
   };
 }
