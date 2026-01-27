@@ -314,7 +314,7 @@ export default function App() {
       }}
     >
       <div style={{ maxWidth: 920, margin: "0 auto", padding: 20 }}>
-        <h1 style={{ margin: "8px 0 16px", letterSpacing: 0.2 }}>방탈출 운영 앱</h1>
+        <h1 style={{ margin: "8px 0 16px", letterSpacing: 0.2 }}>정전 12분</h1>
 
         {/* Top controls */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 18 }}>
