@@ -5,23 +5,25 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  * - Start button + countdown
  * - Remaining time button
  * - Hint button: enter hint code -> open hint in a new window
- * - Hint usage limit: 3
- * - Admin code: enable adding hint codes (limit: 1 add per admin session)
+ * - Hint usage limit: base 3, admin code can grant +1 repeatedly (bonus)
+ * - Admin mode: can add exactly 1 hint per admin session
  *
  * Note: This is NOT secure if deployed publicly with source exposed.
  */
 
 // ======= Config =======
-const DEFAULT_DURATION_MIN = 70;
+const DEFAULT_DURATION_MIN = 70; // ✅ 1시간 10분
 const MAX_HINT_USES = 3;
+const FREE_HINT_CODES = new Set(["E-00"]);
 
 // 운영 편의용 관리자 코드(배포 시 바꾸세요)
-const ADMIN_CODE = "2134";
+const ADMIN_CODE = "ADMIN-2026";
 
 // localStorage keys
 const LS_HINTS = "escape_hints_v1";
 const LS_USES = "escape_hint_uses_v1";
 const LS_TIMER = "escape_timer_v1";
+const LS_BONUS = "escape_hint_bonus_v1"; // ✅ 관리자 코드로 증가되는 추가 사용 가능 횟수
 
 // ======= Helpers =======
 function safeJsonParse(raw, fallback) {
@@ -46,7 +48,6 @@ function normalizeCode(code) {
 }
 
 function openHintWindow({ title, body }) {
-  // 클릭 이벤트에서 호출되어야 팝업 차단이 덜합니다.
   const w = window.open("", "_blank", "noopener,noreferrer,width=520,height=640");
   if (!w) {
     alert("팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해 주세요.");
@@ -59,7 +60,6 @@ function openHintWindow({ title, body }) {
     .replaceAll(">", "&gt;")
     .replaceAll("\n", "<br/>");
 
-  // 어두운 미니멀 힌트 창 스타일
   w.document.write(`
     <!doctype html>
     <html>
@@ -69,17 +69,18 @@ function openHintWindow({ title, body }) {
         <title>${escapedTitle}</title>
         <style>
           :root {
-            --bg: #0a0d14;
-            --card: #101625;
-            --border: #1f2a40;
+            --bg: #070a10;
+            --card: rgba(16, 22, 37, 0.92);
+            --border: rgba(31, 42, 64, 0.9);
             --text: #e7e9ee;
             --muted: #98a2b3;
-            --btn: #141d2f;
-            --btnb: #23304a;
+            --btn: rgba(20, 29, 47, 0.88);
+            --btnb: #25314b;
           }
           body {
             font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-            margin: 0; padding: 18px;
+            margin: 0;
+            padding: 18px;
             background: var(--bg);
             color: var(--text);
           }
@@ -88,9 +89,10 @@ function openHintWindow({ title, body }) {
             border: 1px solid var(--border);
             border-radius: 14px;
             padding: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.28);
           }
           h1 { font-size: 16px; margin: 0 0 10px; letter-spacing: 0.2px; }
-          .body { font-size: 14px; line-height: 1.65; color: var(--text); }
+          .body { font-size: 14px; line-height: 1.65; }
           .meta { margin-top: 12px; font-size: 12px; color: var(--muted); }
           button {
             margin-top: 14px;
@@ -149,9 +151,15 @@ export default function App() {
     };
   });
 
-  // Hint uses
+  // Hint uses (already used count)
   const [hintUses, setHintUses] = useState(() => {
     const saved = Number(localStorage.getItem(LS_USES));
+    return Number.isFinite(saved) ? saved : 0;
+  });
+
+  // Bonus hint uses (granted by admin login; accumulative)
+  const [hintBonus, setHintBonus] = useState(() => {
+    const saved = Number(localStorage.getItem(LS_BONUS));
     return Number.isFinite(saved) ? saved : 0;
   });
 
@@ -176,7 +184,11 @@ export default function App() {
 
   const intervalRef = useRef(null);
 
-  // Persist hints/uses
+  // Derived limits
+  const maxHintUses = MAX_HINT_USES + hintBonus;
+  const hintRemaining = maxHintUses - hintUses;
+
+  // Persist hints/uses/bonus
   useEffect(() => {
     localStorage.setItem(LS_HINTS, JSON.stringify(hints));
   }, [hints]);
@@ -184,6 +196,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(LS_USES, String(hintUses));
   }, [hintUses]);
+
+  useEffect(() => {
+    localStorage.setItem(LS_BONUS, String(hintBonus));
+  }, [hintBonus]);
 
   // Load timer from storage on mount
   useEffect(() => {
@@ -236,8 +252,8 @@ export default function App() {
   }
 
   function handleUseHint() {
-    if (hintUses >= MAX_HINT_USES) {
-      alert(`힌트는 최대 ${MAX_HINT_USES}번까지 사용할 수 있습니다.`);
+    if (hintUses >= maxHintUses) {
+      alert(`힌트는 최대 ${maxHintUses}번까지 사용할 수 있습니다.`);
       return;
     }
 
@@ -252,17 +268,31 @@ export default function App() {
       alert("유효하지 않은 힌트 코드입니다.");
       return;
     }
+    const isFree = FREE_HINT_CODES.has(code);
 
+    if (!isFree) {
+    if (hintUses >= maxHintUses) {
+      alert(`힌트는 최대 ${maxHintUses}번까지 사용할 수 있습니다.`);
+      return;
+    }
     setHintUses((x) => x + 1);
+  }
+
     openHintWindow({ title: hint.title || code, body: hint.body || "" });
     setHintCodeInput("");
   }
 
   function handleAdminLogin() {
     if (adminInput.trim() === ADMIN_CODE) {
+      // ✅ 관리자 코드 입력할 때마다 +1 누적
+      setHintBonus((b) => b + 1);
+
+      // ✅ 관리자 모드 진입 + 힌트 추가 1회 부여(세션 기준)
       setAdminMode(true);
-      setAdminAddRemaining(1); // ✅ 관리자 모드 진입 시 힌트 추가 1회 허용
+      setAdminAddRemaining(1);
+
       setAdminInput("");
+      alert("관리자 승인: 힌트 사용 가능 횟수 +1");
     } else {
       alert("관리자 코드가 올바르지 않습니다.");
     }
@@ -299,7 +329,7 @@ export default function App() {
       [code]: { title: newTitle.trim(), body: newBody.trim() },
     }));
 
-    setAdminAddRemaining((n) => n - 1); // ✅ 1회 차감
+    setAdminAddRemaining((n) => n - 1);
 
     setNewCode("");
     setNewTitle("");
@@ -316,8 +346,6 @@ export default function App() {
     });
   }
 
-  const hintRemaining = MAX_HINT_USES - hintUses;
-
   return (
     <div
       style={{
@@ -326,13 +354,13 @@ export default function App() {
         color: "#e6e8ee",
         // ✅ 어두운 미니멀 배경
         background:
-          "radial-gradient(900px 540px at 18% 12%, rgba(52, 74, 120, 0.16), transparent 60%)," +
-          "radial-gradient(800px 520px at 82% 20%, rgba(110, 110, 110, 0.10), transparent 58%)," +
+          "radial-gradient(900px 540px at 18% 12%, rgba(52, 74, 120, 0.14), transparent 60%)," +
+          "radial-gradient(800px 520px at 82% 20%, rgba(110, 110, 110, 0.08), transparent 58%)," +
           "linear-gradient(180deg, #070a10 0%, #0b0f19 55%, #070a10 100%)",
       }}
     >
       <div style={{ maxWidth: 920, margin: "0 auto", padding: 20 }}>
-        <h1 style={{ margin: "8px 0 16px", letterSpacing: 0.2 }}>정전 12분</h1>
+        <h1 style={{ margin: "8px 0 16px", letterSpacing: 0.2 }}>방탈출 운영 앱</h1>
 
         {/* Top controls */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 18 }}>
@@ -355,7 +383,12 @@ export default function App() {
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 14, color: "#aab2c5" }}>
-              힌트 사용 가능: <b>{hintRemaining}</b> / {MAX_HINT_USES}
+              힌트 사용 가능: <b>{Math.max(0, hintRemaining)}</b> / {maxHintUses}
+              {hintBonus > 0 ? (
+                <span style={{ marginLeft: 8, fontSize: 12, color: "#8fa3c5" }}>
+                  (보너스 +{hintBonus})
+                </span>
+              ) : null}
             </span>
           </div>
         </div>
@@ -376,7 +409,7 @@ export default function App() {
           </div>
           <div style={{ marginTop: 10, fontSize: 13, color: "#aab2c5" }}>
             - 유효한 코드를 입력하면 새 창으로 힌트가 표시됩니다. <br />
-            - 힌트 사용은 최대 {MAX_HINT_USES}회로 제한됩니다.
+            - 기본 힌트 사용은 {MAX_HINT_USES}회이며, 관리자 코드 입력 시 +1씩 누적됩니다.
           </div>
         </div>
 
@@ -394,10 +427,10 @@ export default function App() {
                 style={inputStyle()}
               />
               <button onClick={handleAdminLogin} style={btnStyleNeutral()}>
-                관리자 모드 켜기
+                관리자 모드 켜기 (+1)
               </button>
               <div style={{ fontSize: 13, color: "#aab2c5" }}>
-                관리자 모드에서 힌트 코드를 1개만 추가할 수 있습니다.
+                관리자 코드 입력 시마다 힌트 사용 가능 횟수 +1, 그리고 관리자 모드에서 힌트 1개 추가 가능.
               </div>
             </div>
           ) : (
@@ -431,12 +464,30 @@ export default function App() {
                 >
                   힌트 코드 추가 ({adminAddRemaining}/1)
                 </button>
+
                 <button
                   onClick={() => setAdminMode(false)}
                   style={btnStyleNeutral()}
                   title="관리자 모드를 종료합니다."
                 >
                   관리자 모드 끄기
+                </button>
+
+                <button
+                  onClick={() => {
+                    // 보너스도 유지한 채, 추가 힌트만 더 받고 싶을 때 재인증
+                    const code = prompt("관리자 코드를 다시 입력하면 힌트 사용 +1이 추가됩니다.");
+                    if ((code || "").trim() === ADMIN_CODE) {
+                      setHintBonus((b) => b + 1);
+                      alert("관리자 승인: 힌트 사용 가능 횟수 +1");
+                    } else if (code !== null) {
+                      alert("관리자 코드가 올바르지 않습니다.");
+                    }
+                  }}
+                  style={btnStyleNeutral()}
+                  title="관리자 코드 재입력으로 힌트 사용 가능 횟수를 +1 추가합니다."
+                >
+                  +1 추가 지급
                 </button>
               </div>
 
