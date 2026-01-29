@@ -12,11 +12,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  */
 
 // ======= Config =======
-const DEFAULT_DURATION_MIN = 90;
+const DEFAULT_DURATION_MIN = 70;
 const MAX_HINT_USES = 3;
 
 // 운영 편의용 관리자 코드(배포 시 바꾸세요)
-const ADMIN_CODE = "ADMIN-2026";
+const ADMIN_CODE = "2134";
 
 // localStorage keys
 const LS_HINTS = "escape_hints_v1";
@@ -126,8 +126,26 @@ export default function App() {
 
     // 초기 기본 힌트(예시) - 운영 시 지우거나 수정
     return {
-      "HINT-001": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
-      "HINT-002": { title: "힌트 002", body: "CCTV를 '보는 권한'과 '삭제/정책 변경 권한'은 다를 수 있습니다." },
+      "E-00": { title: "힌트 예시", body: "게임을 시작하지" },
+      "E-01": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-02": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-03": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-04": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-05": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-06": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-07": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-08": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-09": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-10": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-11": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-12": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-13": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-14": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-15": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-16": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-17": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+      "E-18": { title: "힌트 001", body: "정전 12분은 '침입'보다 '기록 혼선'에 의미가 있습니다." },
+
     };
   });
 
@@ -349,7 +367,7 @@ export default function App() {
             <input
               value={hintCodeInput}
               onChange={(e) => setHintCodeInput(e.target.value)}
-              placeholder="힌트 코드 입력 (예: HINT-001)"
+              placeholder="힌트 코드 입력 (예: E-00)"
               style={inputStyle()}
             />
             <button onClick={handleUseHint} style={btnStylePrimary(false)}>
