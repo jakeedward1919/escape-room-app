@@ -18,7 +18,7 @@ const MAX_HINT_USES = 5;
 const FREE_HINT_CODES = new Set(["E-00"]);
 
 // 운영 편의용 관리자 코드(배포 시 바꾸세요)
-const ADMIN_CODE = "ADMIN-2026";
+const ADMIN_CODE = "2134";
 
 // localStorage keys
 const LS_HINTS = "escape_hints_v1";
